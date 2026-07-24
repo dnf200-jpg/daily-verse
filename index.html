@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f7f0da">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>오늘의 말씀</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    font-family:'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+    font-weight:300;
+    overflow:hidden;
+    background:#f7f0da;
+    color:#4a463c;
+    transition:color .8s ease;
+  }
+  body.light-text { color:#fdfcf8; }
+
+  /* ── 배경 씬 ─────────────────────────── */
+  .scene {
+    position:fixed; inset:0; opacity:0;
+    transition:opacity 1.4s ease;
+    pointer-events:none;
+  }
+  .scene.on { opacity:1; }
+  .scene svg { position:absolute; bottom:0; left:0; width:100%; height:52%; display:block; }
+
+  #sc-mist   { background:linear-gradient(180deg,#faf3dc 0%,#f6ecd0 34%,#eadcc0 60%,#d8c5ab 100%); }
+  #sc-sea    { background:linear-gradient(180deg,#fdf4e2 0%,#f8d9c3 16%,#f1a8b2 32%,#e78d9d 42%,#eeb59b 48%,#d9b5a9 58%,#a3c2d9 78%,#78a7c8 100%); }
+  #sc-dusk   { background:linear-gradient(180deg,#535d84 0%,#7c688f 26%,#b57a85 46%,#e5927f 62%,#f2a985 78%,#f7c9a0 100%); }
+  #sc-night  { background:linear-gradient(180deg,#0a0f24 0%,#141c3a 48%,#26355c 82%,#3c4f78 100%); }
+  #sc-dawn   { background:linear-gradient(180deg,#e7e1f3 0%,#efd9dd 38%,#f7ddd2 64%,#faeddc 100%); }
+  #sc-gold   { background:linear-gradient(180deg,#fcecc9 0%,#f5d49a 34%,#e5ab6e 66%,#c07d4b 100%); }
+
+  /* ── 공통 레이아웃 ────────────────────── */
+  #app {
+    position:relative; height:100dvh; max-width:520px; margin:0 auto;
+    display:flex; flex-direction:column;
+  }
+  .screen {
+    position:absolute; inset:0; display:none; flex-direction:column;
+    padding:max(24px, env(safe-area-inset-top)) 28px calc(28px + env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .screen.on { display:flex; animation:fadein .7s ease; }
+  @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+  .grow { flex:1; }
+  .center-col { display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
+
+  /* 상단 진행 바 */
+  .topbar { display:flex; align-items:center; gap:18px; margin-bottom:34px; }
+  .back-btn {
+    background:none; border:none; cursor:pointer; padding:6px;
+    color:inherit; opacity:.65; font-size:22px; line-height:1;
+  }
+  .progress { flex:1; height:4px; border-radius:99px; background:rgba(90,84,70,.18); overflow:hidden; }
+  .progress > i { display:block; height:100%; width:0; border-radius:99px; background:#7a7362; transition:width .5s ease; }
+
+  /* 질문 화면 */
+  .q-title {
+    font-size:clamp(22px, 6vw, 27px); font-weight:400; line-height:1.45;
+    text-align:center; margin-bottom:30px; color:#55503f;
+  }
+  .opts { display:flex; flex-direction:column; gap:14px; }
+  .opt {
+    background:rgba(255,255,255,.94); border:none; border-radius:15px;
+    padding:21px 24px; font-size:17.5px; font-weight:300; color:#4a463c;
+    text-align:left; cursor:pointer; font-family:inherit;
+    box-shadow:0 3px 14px rgba(96,80,50,.09);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .opt:active { transform:scale(.975); }
+  .opt small { display:block; margin-top:4px; font-size:13.5px; opacity:.6; letter-spacing:.02em; }
+
+  /* 필 버튼 */
+  .pill {
+    display:block; width:100%; padding:19px 20px;
+    background:none; border:1.5px solid currentColor; border-radius:999px;
+    color:inherit; font-family:inherit; font-size:14.5px; font-weight:400;
+    letter-spacing:.32em; text-indent:.32em; cursor:pointer;
+    transition:background .2s ease, transform .15s ease;
+  }
+  .pill:active { transform:scale(.98); }
+  .pill.solid { background:rgba(60,55,42,.85); border-color:transparent; color:#fdfcf5; }
+  body.light-text .pill.solid { background:rgba(255,255,255,.92); color:#3d3a30; }
+
+  /* 인트로 */
+  .brand-label { font-size:12.5px; letter-spacing:.5em; text-indent:.5em; opacity:.55; margin-bottom:18px; }
+  .brand-title { font-size:clamp(40px,11vw,52px); font-weight:200; letter-spacing:.04em; color:#4d4837; }
+  .brand-sub { margin-top:20px; font-size:16px; line-height:1.8; opacity:.7; }
+
+  /* 목표 화면 */
+  .goal-icon { width:104px; height:104px; margin:0 auto 34px; display:block; }
+  .goal-title { font-size:clamp(26px,7vw,32px); font-weight:300; text-align:center; margin-bottom:38px; color:#55503f; }
+  .goal-card {
+    display:flex; align-items:center; gap:18px;
+    background:rgba(255,255,255,.55); border-radius:17px;
+    padding:20px 22px; margin-bottom:16px;
+    font-size:16.5px; line-height:1.6; color:#524d3f;
+  }
+  .goal-check {
+    flex:none; width:44px; height:44px; border-radius:50%;
+    background:#a9a291; color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+
+  /* 인물 결과 카드 */
+  .char-card {
+    background:rgba(255,255,255,.88); border-radius:22px;
+    padding:44px 34px; text-align:center;
+    box-shadow:0 10px 40px rgba(80,64,40,.13);
+  }
+  .char-pre { font-size:19px; opacity:.75; margin-bottom:14px; }
+  .char-name { font-size:clamp(38px,10vw,46px); font-weight:300; color:#3d3a30; margin-bottom:12px; }
+  .char-trait { font-size:18.5px; opacity:.72; margin-bottom:26px; }
+  .char-desc { font-size:16.5px; line-height:1.75; opacity:.85; }
+
+  /* 말씀 화면 */
+  .verse-wrap { flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; padding:10px 4px; }
+  .verse-text {
+    font-size:clamp(21px, 5.9vw, 26px); font-weight:300; line-height:1.72;
+    text-shadow:0 1px 14px rgba(0,0,0,.06);
+    white-space:pre-line; word-break:keep-all;
+  }
+  body.light-text .verse-text { text-shadow:0 2px 18px rgba(0,0,0,.28); }
+  .verse-ref {
+    margin-top:34px; font-size:13.5px; letter-spacing:.42em; text-indent:.42em;
+    opacity:.72; font-weight:400;
+  }
+  .cta-card {
+    background:rgba(255,255,255,.82); color:#4a463c;
+    border-radius:17px; padding:20px 22px; margin-bottom:22px;
+    backdrop-filter:blur(6px);
+    box-shadow:0 6px 24px rgba(40,32,18,.12);
+    text-align:left;
+  }
+  body.light-text .cta-card { background:rgba(255,255,255,.9); }
+  .cta-label { font-size:12px; letter-spacing:.34em; opacity:.6; margin-bottom:10px; font-weight:500; }
+  .cta-text { font-size:16px; line-height:1.7; word-break:keep-all; }
+
+  /* 메인 상단/하단 */
+  .main-top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .main-date { font-size:13px; letter-spacing:.28em; text-indent:.28em; opacity:.66; }
+  .main-streak { margin-top:9px; font-size:13.5px; opacity:.6; }
+  .icon-btn {
+    background:none; border:none; cursor:pointer; color:inherit;
+    padding:8px; opacity:.8; display:inline-flex;
+  }
+  .icon-btn svg { width:26px; height:26px; }
+  .main-actions { display:flex; gap:4px; }
+  .cat-chip {
+    margin-top:14px; display:inline-flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,.32); border:1px solid rgba(120,110,90,.25);
+    border-radius:999px; padding:9px 18px; cursor:pointer;
+    color:inherit; font-family:inherit; font-size:13.5px; font-weight:400;
+    letter-spacing:.06em; backdrop-filter:blur(4px);
+    transition:background .2s ease;
+  }
+  body.light-text .cat-chip { background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.4); }
+  .cat-chip i { font-style:normal; opacity:.6; font-size:11px; }
+  .main-bottom { display:flex; flex-direction:column; gap:16px; }
+  .saved-link {
+    background:none; border:none; color:inherit; font-family:inherit; cursor:pointer;
+    font-size:13.5px; letter-spacing:.22em; text-indent:.22em; opacity:.62; padding:6px;
+  }
+
+  /* 지금 상황 선택 패널 */
+  #catPanel {
+    position:fixed; inset:0; z-index:40; display:none; flex-direction:column;
+    background:#f6efd9; color:#4a463c;
+    max-width:520px; margin:0 auto; overflow-y:auto;
+    padding:max(24px, env(safe-area-inset-top)) 28px 28px;
+  }
+  #catPanel.on { display:flex; animation:fadein .4s ease; }
+
+  /* 저장 목록 패널 */
+  #savedPanel {
+    position:fixed; inset:0; z-index:40; display:none; flex-direction:column;
+    background:#f6efd9; color:#4a463c;
+    max-width:520px; margin:0 auto;
+    padding:max(24px, env(safe-area-inset-top)) 28px 28px;
+    overflow-y:auto;
+  }
+  #savedPanel.on { display:flex; animation:fadein .4s ease; }
+  .sp-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:26px; }
+  .sp-title { font-size:20px; font-weight:400; letter-spacing:.1em; }
+  .sp-list { flex:1; display:flex; flex-direction:column; gap:14px; }
+  .sp-item {
+    background:rgba(255,255,255,.9); border-radius:15px; padding:20px 22px;
+    box-shadow:0 3px 12px rgba(96,80,50,.08);
+  }
+  .sp-item p { font-size:15.5px; line-height:1.7; word-break:keep-all; }
+  .sp-item .ref { margin-top:10px; font-size:12px; letter-spacing:.3em; opacity:.6; }
+  .sp-empty { text-align:center; opacity:.55; margin:60px 0; line-height:1.8; }
+  .sp-settings { margin-top:30px; border-top:1px solid rgba(90,84,70,.15); padding-top:22px; display:flex; flex-direction:column; gap:10px; }
+  .sp-set-label { font-size:12px; letter-spacing:.3em; opacity:.5; margin-bottom:6px; }
+  .sp-btn {
+    background:rgba(255,255,255,.85); border:none; border-radius:12px;
+    padding:15px 18px; font-size:15px; color:#4a463c; font-family:inherit;
+    text-align:left; cursor:pointer; box-shadow:0 2px 8px rgba(96,80,50,.06);
+  }
+  .sp-reset {
+    margin-top:10px; background:none; border:none; color:inherit; font-family:inherit;
+    cursor:pointer; font-size:12.5px; opacity:.45; letter-spacing:.15em; padding:8px;
+  }
+  .sp-foot { text-align:center; margin-top:12px; font-size:12px; opacity:.4; }
+  .sp-foot a { color:inherit; }
+
+  /* 토스트 */
+  #toast {
+    position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(20px);
+    background:rgba(45,41,32,.92); color:#faf7ee;
+    padding:13px 26px; border-radius:999px; font-size:14.5px; letter-spacing:.06em;
+    opacity:0; pointer-events:none; transition:all .35s ease; z-index:60; white-space:nowrap;
+  }
+  #toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ── 배경 씬들 ── -->
+<div class="scene on" id="sc-mist">
+  <svg viewBox="0 0 500 260" preserveAspectRatio="none">
+    <path d="M0,150 L90,96 L150,140 L230,80 L310,150 L390,105 L460,150 L500,125 L500,260 L0,260 Z" fill="rgba(146,128,110,.30)"/>
+    <path d="M0,190 L70,150 L160,196 L260,132 L350,196 L430,158 L500,190 L500,260 L0,260 Z" fill="rgba(118,98,84,.42)"/>
+    <path d="M0,230 L110,186 L210,236 L330,178 L430,232 L500,205 L500,260 L0,260 Z" fill="rgba(84,66,56,.58)"/>
+  </svg>
+</div>
+<div class="scene" id="sc-sea">
+  <svg viewBox="0 0 500 260" preserveAspectRatio="none">
+    <rect x="0" y="30" width="500" height="4" fill="rgba(255,255,255,.25)"/>
+    <rect x="60" y="70" width="380" height="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="120" y="110" width="260" height="3" fill="rgba(255,255,255,.14)"/>
+    <rect x="40" y="160" width="420" height="3" fill="rgba(255,255,255,.10)"/>
+  </svg>
+</div>
+<div class="scene" id="sc-dusk">
+  <svg viewBox="0 0 500 260" preserveAspectRatio="none">
+    <path d="M0,140 L80,70 L170,135 L260,55 L350,130 L440,85 L500,120 L500,260 L0,260 Z" fill="rgba(40,36,66,.55)"/>
+    <path d="M0,200 L100,140 L200,205 L300,130 L400,200 L500,160 L500,260 L0,260 Z" fill="rgba(26,23,48,.85)"/>
+  </svg>
+</div>
+<div class="scene" id="sc-night">
+  <svg viewBox="0 0 500 500" preserveAspectRatio="xMidYMax slice" style="height:100%;">
+    <g fill="#ffffff">
+      <circle cx="40" cy="60" r="1.5" opacity=".9"/><circle cx="120" cy="30" r="1" opacity=".7"/>
+      <circle cx="200" cy="90" r="1.3" opacity=".8"/><circle cx="280" cy="40" r="1" opacity=".6"/>
+      <circle cx="350" cy="110" r="1.6" opacity=".9"/><circle cx="430" cy="70" r="1" opacity=".7"/>
+      <circle cx="470" cy="150" r="1.2" opacity=".8"/><circle cx="80" cy="160" r="1" opacity=".6"/>
+      <circle cx="160" cy="200" r="1.4" opacity=".8"/><circle cx="240" cy="150" r="1" opacity=".5"/>
+      <circle cx="320" cy="220" r="1.2" opacity=".7"/><circle cx="400" cy="190" r="1" opacity=".6"/>
+      <circle cx="60" cy="260" r="1.3" opacity=".7"/><circle cx="140" cy="300" r="1" opacity=".5"/>
+      <circle cx="300" cy="300" r="1.5" opacity=".8"/><circle cx="440" cy="280" r="1" opacity=".6"/>
+    </g>
+    <path d="M0,430 L110,370 L220,435 L340,360 L450,430 L500,405 L500,500 L0,500 Z" fill="rgba(6,9,20,.9)"/>
+  </svg>
+</div>
+<div class="scene" id="sc-dawn">
+  <svg viewBox="0 0 500 260" preserveAspectRatio="none">
+    <path d="M0,170 Q125,110 250,165 T500,155 L500,260 L0,260 Z" fill="rgba(173,150,168,.35)"/>
+    <path d="M0,215 Q140,160 280,212 T500,205 L500,260 L0,260 Z" fill="rgba(140,116,138,.5)"/>
+  </svg>
+</div>
+<div class="scene" id="sc-gold">
+  <svg viewBox="0 0 500 260" preserveAspectRatio="none">
+    <path d="M0,180 Q100,140 200,178 T400,172 T500,180 L500,260 L0,260 Z" fill="rgba(146,90,46,.45)"/>
+    <path d="M0,225 Q120,190 250,222 T500,218 L500,260 L0,260 Z" fill="rgba(104,60,28,.6)"/>
+  </svg>
+</div>
+
+<div id="app">
+
+  <!-- 인트로 -->
+  <section class="screen on" id="s-intro">
+    <div class="grow center-col">
+      <div class="brand-label">DAILY VERSE</div>
+      <h1 class="brand-title">오늘의 말씀</h1>
+      <p class="brand-sub">하루를 여는 한 구절,<br>마음에 새기는 말씀</p>
+    </div>
+    <button class="pill" onclick="go('s-q1')">시작하기</button>
+  </section>
+
+  <!-- 질문 1 -->
+  <section class="screen" id="s-q1">
+    <div class="topbar">
+      <button class="back-btn" onclick="go('s-intro')">‹</button>
+      <div class="progress"><i style="width:20%"></i></div>
+    </div>
+    <h2 class="q-title">요즘 마음 깊은 곳에서<br>무엇과 가장 씨름하고 있나요?</h2>
+    <div class="opts">
+      <button class="opt" onclick="pickCat('guilt')">죄책감이나 수치심</button>
+      <button class="opt" onclick="pickCat('anxiety')">불안과 걱정</button>
+      <button class="opt" onclick="pickCat('lonely')">외로움과 공허함</button>
+      <button class="opt" onclick="pickCat('lust')">정욕과 원치 않는 생각</button>
+      <button class="opt" onclick="pickCat('distant')">하나님과 멀어진 느낌</button>
+      <button class="opt" onclick="pickCat('doubt')">의심과 실망</button>
+      <button class="opt" onclick="pickCat('unsure')">잘 모르겠어요</button>
+    </div>
+  </section>
+
+  <!-- 질문 2 -->
+  <section class="screen" id="s-q2">
+    <div class="topbar">
+      <button class="back-btn" onclick="go('s-q1')">‹</button>
+      <div class="progress"><i style="width:40%"></i></div>
+    </div>
+    <h2 class="q-title">언제 말씀과 함께하고 싶으세요?</h2>
+    <div class="opts">
+      <button class="opt" onclick="pickTime('아침')">아침 <small>하루를 시작할 때</small></button>
+      <button class="opt" onclick="pickTime('점심')">점심 <small>잠시 쉬어갈 때</small></button>
+      <button class="opt" onclick="pickTime('저녁')">저녁 <small>하루를 돌아볼 때</small></button>
+      <button class="opt" onclick="pickTime('잠들기 전')">잠들기 전 <small>마음을 정리할 때</small></button>
+    </div>
+  </section>
+
+  <!-- 목표 확인 -->
+  <section class="screen" id="s-goals">
+    <div class="topbar">
+      <button class="back-btn" onclick="go('s-q2')">‹</button>
+      <div class="progress"><i style="width:60%"></i></div>
+    </div>
+    <div class="grow" style="display:flex; flex-direction:column; justify-content:center;">
+      <svg class="goal-icon" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="rgba(255,255,255,.85)"/>
+        <circle cx="50" cy="50" r="30" fill="#c9c2ae"/>
+        <circle cx="50" cy="50" r="18" fill="#f4efdf"/>
+        <circle cx="50" cy="50" r="7" fill="#8b8371"/>
+        <line x1="50" y1="50" x2="76" y2="24" stroke="#6b6455" stroke-width="4" stroke-linecap="round"/>
+        <path d="M76,24 L86,20 L82,30 Z" fill="#6b6455"/>
+      </svg>
+      <h2 class="goal-title">알겠어요!<br>이렇게 도와드릴게요:</h2>
+      <div class="goal-card"><span class="goal-check">✓</span><span id="goal1"></span></div>
+      <div class="goal-card"><span class="goal-check">✓</span><span id="goal2"></span></div>
+    </div>
+    <button class="pill" onclick="go('s-chars')">계속하기</button>
+  </section>
+
+  <!-- 인물 선택 -->
+  <section class="screen" id="s-chars">
+    <div class="topbar">
+      <button class="back-btn" onclick="go('s-goals')">‹</button>
+      <div class="progress"><i style="width:80%"></i></div>
+    </div>
+    <h2 class="q-title">어떤 믿음의 인물이<br>마음에 와닿나요?</h2>
+    <div class="opts">
+      <button class="opt" onclick="pickChar('esther')">에스더 <small>용기 있고 결단력 있는</small></button>
+      <button class="opt" onclick="pickChar('david')">다윗 <small>마음을 다해 예배하는</small></button>
+      <button class="opt" onclick="pickChar('daniel')">다니엘 <small>흔들리지 않고 신실한</small></button>
+      <button class="opt" onclick="pickChar('ruth')">룻 <small>끝까지 곁을 지키는</small></button>
+      <button class="opt" onclick="pickChar('peter')">베드로 <small>넘어져도 다시 일어서는</small></button>
+      <button class="opt" onclick="pickChar('mary')">마리아 <small>믿음으로 순종하는</small></button>
+    </div>
+  </section>
+
+  <!-- 인물 결과 -->
+  <section class="screen" id="s-charResult">
+    <div class="grow center-col">
+      <div class="char-card">
+        <p class="char-pre">탁월한 선택이에요.</p>
+        <h2 class="char-name" id="charName"></h2>
+        <p class="char-trait" id="charTrait"></p>
+        <p class="char-desc">첫 번째 말씀은 <b id="charName2"></b>의<br>삶에서 영감을 받아 준비했어요.</p>
+      </div>
+    </div>
+    <button class="pill" onclick="showFirstVerse()">내 말씀 보기</button>
+  </section>
+
+  <!-- 첫 말씀 -->
+  <section class="screen" id="s-firstVerse">
+    <div class="verse-wrap">
+      <p class="verse-text" id="fvText"></p>
+      <p class="verse-ref" id="fvRef"></p>
+    </div>
+    <div class="cta-card">
+      <div class="cta-label">🙌 실천 카드</div>
+      <div class="cta-text" id="fvCta"></div>
+    </div>
+    <button class="pill" onclick="enterMain()">계속하기</button>
+  </section>
+
+  <!-- 메인 -->
+  <section class="screen" id="s-main">
+    <div class="main-top">
+      <div>
+        <div class="main-date" id="mDate"></div>
+        <div class="main-streak" id="mStreak"></div>
+        <button class="cat-chip" onclick="openCatPanel()">지금 마음 · <span id="catLabel"></span> <i>▾</i></button>
+      </div>
+      <div class="main-actions">
+        <button class="icon-btn" id="btnNotif" onclick="toggleNotif()" title="알림">
+          <svg id="bellIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M18 9C18 5.7 15.3 3 12 3C8.7 3 6 5.7 6 9C6 14 4 15.5 4 15.5H20C20 15.5 18 14 18 9Z"/>
+            <path d="M10 19C10.4 19.9 11.1 20.5 12 20.5C12.9 20.5 13.6 19.9 14 19"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btnSave" onclick="toggleSave()" title="저장">
+          <svg id="heartIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M12 21C12 21 3.5 15.5 3.5 9.5C3.5 6.5 5.8 4.5 8.2 4.5C9.9 4.5 11.3 5.5 12 6.8C12.7 5.5 14.1 4.5 15.8 4.5C18.2 4.5 20.5 6.5 20.5 9.5C20.5 15.5 12 21 12 21Z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="shareVerse()" title="공유">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <rect x="8" y="8" width="12" height="12" rx="2.5"/>
+            <path d="M16 8V6.5C16 5.1 14.9 4 13.5 4H6.5C5.1 4 4 5.1 4 6.5V13.5C4 14.9 5.1 16 6.5 16H8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="verse-wrap">
+      <p class="verse-text" id="mText"></p>
+      <p class="verse-ref" id="mRef"></p>
+    </div>
+    <div class="main-bottom">
+      <div class="cta-card">
+        <div class="cta-label">🙌 실천 카드</div>
+        <div class="cta-text" id="mCta"></div>
+      </div>
+      <button class="pill" onclick="nextVerse()">새로운 말씀</button>
+      <button class="saved-link" onclick="openSaved()">저장한 말씀 <span id="savedCount"></span></button>
+    </div>
+  </section>
+
+</div>
+
+<!-- 지금 상황 선택 -->
+<div id="catPanel">
+  <div class="sp-head">
+    <div class="sp-title">지금 마음이 어떤가요?</div>
+    <button class="back-btn" style="font-size:26px" onclick="closeCatPanel()">×</button>
+  </div>
+  <p style="font-size:14.5px; opacity:.6; margin:-10px 0 22px; line-height:1.6;">선택한 상황에 맞는 말씀을 골라 드려요.</p>
+  <div class="opts">
+    <button class="opt" onclick="changeCat('guilt')">죄책감이나 수치심</button>
+    <button class="opt" onclick="changeCat('anxiety')">불안과 걱정</button>
+    <button class="opt" onclick="changeCat('lonely')">외로움과 공허함</button>
+    <button class="opt" onclick="changeCat('lust')">정욕과 원치 않는 생각</button>
+    <button class="opt" onclick="changeCat('distant')">하나님과 멀어진 느낌</button>
+    <button class="opt" onclick="changeCat('doubt')">의심과 실망</button>
+    <button class="opt" onclick="changeCat('unsure')">잘 모르겠어요 <small>오늘의 소망 구절을 보여드려요</small></button>
+  </div>
+</div>
+
+<!-- 저장 목록 + 설정 -->
+<div id="savedPanel">
+  <div class="sp-head">
+    <div class="sp-title">저장한 말씀</div>
+    <button class="back-btn" style="font-size:26px" onclick="closeSaved()">×</button>
+  </div>
+  <div class="sp-list" id="spList"></div>
+  <div class="sp-settings">
+    <div class="sp-set-label">설정</div>
+    <button class="sp-btn" id="installBtn" style="display:none" onclick="installApp()">📲 홈 화면에 설치하기</button>
+    <button class="sp-btn" onclick="exportData()">💾 데이터 내보내기 (백업)</button>
+    <button class="sp-btn" onclick="document.getElementById('importFile').click()">📂 데이터 가져오기 (복원)</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(this)">
+    <button class="sp-reset" onclick="resetAll()">처음부터 다시 시작하기</button>
+  </div>
+  <div class="sp-foot"><a href="privacy.html">개인정보처리방침</a> · v1.0.0</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── 말씀 데이터 (개역한글 — 저작권 만료 번역, 상업적 배포 가능) ───
+const VERSES = [
+  // 불안과 걱정
+  { cat:'anxiety', t:'아무 것도 염려하지 말고 오직 모든 일에 기도와 간구로, 너희 구할 것을 감사함으로 하나님께 아뢰라.', r:'빌립보서 4:6', c:'지금 마음을 가장 무겁게 하는 걱정 한 가지를, 짧은 기도로 하나님께 그대로 아뢰어 보세요.' },
+  { cat:'anxiety', t:'너희 염려를 다 주께 맡겨 버리라 이는 저가 너희를 권고하심이니라.', r:'베드로전서 5:7', c:'걱정거리를 종이에 적은 뒤 "맡깁니다"라고 소리 내어 고백해 보세요.' },
+  { cat:'anxiety', t:'내일 일을 위하여 염려하지 말라 내일 일은 내일 염려할 것이요 한 날의 괴로움은 그 날에 족하니라.', r:'마태복음 6:34', c:'내일 걱정이 떠오를 때마다 "오늘 내가 할 수 있는 한 가지"로 생각을 되돌려 보세요.' },
+  { cat:'anxiety', t:'두려워 말라 내가 너와 함께 함이니라 놀라지 말라 나는 네 하나님이 됨이니라 내가 너를 굳세게 하리라 참으로 너를 도와주리라.', r:'이사야 41:10', c:'두려움이 밀려올 때 "내가 너와 함께 함이니라"를 세 번 천천히 되뇌어 보세요.' },
+  { cat:'anxiety', t:'평안을 너희에게 끼치노니 곧 나의 평안을 너희에게 주노라 너희는 마음에 근심도 말고 두려워하지도 말라.', r:'요한복음 14:27', c:'잠들기 전 3분, 휴대폰을 내려놓고 조용히 이 평안을 구하는 시간을 가져 보세요.' },
+  { cat:'anxiety', t:'네 짐을 여호와께 맡겨 버리라 저가 너를 붙드시고 의인의 요동함을 영영히 허락지 아니하시리로다.', r:'시편 55:22', c:'오늘 어깨를 누르는 짐 하나의 이름을 부르며 "맡깁니다"라고 기도해 보세요.' },
+  { cat:'anxiety', t:'여호와는 나의 목자시니 내가 부족함이 없으리로다 그가 나를 푸른 초장에 누이시며 쉴만한 물 가으로 인도하시는도다.', r:'시편 23:1-2', c:'오늘 5분, 조용한 곳에서 "여호와는 나의 목자"를 천천히 묵상해 보세요.' },
+  { cat:'anxiety', t:'수고하고 무거운 짐진 자들아 다 내게로 오라 내가 너희를 쉬게 하리라.', r:'마태복음 11:28', c:'지친 마음 그대로, 꾸미지 말고 주님 앞에 나아가 쉼을 구해 보세요.' },
+  { cat:'anxiety', t:'내가 평안히 눕고 자기도 하리니 나를 안전히 거하게 하시는 이는 오직 여호와시니이다.', r:'시편 4:8', c:'오늘 밤 휴대폰 대신 이 구절을 마지막으로 읽고 잠들어 보세요.' },
+  { cat:'anxiety', t:'너의 행사를 여호와께 맡기라 그리하면 너의 경영하는 것이 이루리라.', r:'잠언 16:3', c:'오늘 시작하는 일 하나를 먼저 짧은 기도로 맡기고 시작해 보세요.' },
+  // 죄책감과 수치심
+  { cat:'guilt', t:'만일 우리가 우리 죄를 자백하면 저는 미쁘시고 의로우사 우리 죄를 사하시며 모든 불의에서 우리를 깨끗케 하실 것이요.', r:'요한일서 1:9', c:'숨기고 싶던 마음 하나를 오늘 솔직하게 자백하는 기도를 드려 보세요. 용서는 이미 준비되어 있어요.' },
+  { cat:'guilt', t:'동이 서에서 먼 것 같이 우리 죄과를 우리에게서 멀리 옮기셨으며.', r:'시편 103:12', c:'하나님이 이미 멀리 옮기신 잘못을 스스로 다시 붙잡고 있지는 않은지 돌아보세요.' },
+  { cat:'guilt', t:'그러므로 이제 그리스도 예수 안에 있는 자에게는 결코 정죄함이 없나니.', r:'로마서 8:1', c:'자신을 정죄하는 생각이 들 때마다 "결코 정죄함이 없다"는 이 구절로 대답해 보세요.' },
+  { cat:'guilt', t:'너희 죄가 주홍 같을지라도 눈과 같이 희어질 것이요 진홍 같이 붉을지라도 양털 같이 되리라.', r:'이사야 1:18', c:'오늘, 지난 잘못 대신 새로 시작할 수 있는 한 가지에 마음을 두어 보세요.' },
+  { cat:'guilt', t:'그런즉 누구든지 그리스도 안에 있으면 새로운 피조물이라 이전 것은 지나갔으니 보라 새 것이 되었도다.', r:'고린도후서 5:17', c:'"나는 새로운 피조물"이라고 오늘 아침 거울 앞에서 한 번 말해 보세요.' },
+  { cat:'guilt', t:'하나님의 구하시는 제사는 상한 심령이라 하나님이여 상하고 통회하는 마음을 주께서 멸시치 아니하시리이다.', r:'시편 51:17', c:'잘 정리된 기도가 아니어도 괜찮아요. 상한 마음 그대로 드려 보세요.' },
+  { cat:'guilt', t:'다시 우리를 긍휼히 여기셔서 우리의 죄악을 발로 밟으시고 우리의 모든 죄를 깊은 바다에 던지시리이다.', r:'미가 7:19', c:'깊은 바다에 던져진 죄를 다시 건져 올리려 하지 않기로 오늘 결심해 보세요.' },
+  { cat:'guilt', t:'내가 이르기를 내 허물을 여호와께 자복하리라 하고 주께 내 죄를 아뢰고 내 죄악을 숨기지 아니하였더니 곧 주께서 내 죄의 악을 사하셨나이다.', r:'시편 32:5', c:'숨기고 있던 것 하나를 솔직히 아뢰는 것으로 오늘을 가볍게 시작해 보세요.' },
+  { cat:'guilt', t:'너희가 그 은혜를 인하여 믿음으로 말미암아 구원을 얻었나니 이것이 너희에게서 난 것이 아니요 하나님의 선물이라.', r:'에베소서 2:8', c:'오늘은 자격을 증명하려 애쓰는 대신, 선물로 받은 은혜를 떠올려 보세요.' },
+  { cat:'guilt', t:'나도 너를 정죄하지 아니하노니 가서 다시는 죄를 범치 말라.', r:'요한복음 8:11', c:'"나도 너를 정죄하지 아니하노니" — 이 음성을 나에게 하시는 말씀으로 들어 보세요.' },
+  // 외로움과 공허함
+  { cat:'lonely', t:'내가 세상 끝날까지 너희와 항상 함께 있으리라.', r:'마태복음 28:20', c:'혼자라고 느껴지는 순간, 이 약속을 떠올리며 짧게 "함께해 주셔서 감사합니다"라고 기도해 보세요.' },
+  { cat:'lonely', t:'여호와께서 친히 네 앞서 행하시며 너와 함께 하사 너를 떠나지 아니하시며 버리지 아니하시리니 너는 두려워 말라 놀라지 말라.', r:'신명기 31:8', c:'오늘 외로울 누군가에게 먼저 안부 메시지를 보내 보세요. 위로는 나눌 때 커져요.' },
+  { cat:'lonely', t:'내 부모는 나를 버렸으나 여호와는 나를 영접하시리이다.', r:'시편 27:10', c:'사람에게 받은 서운함을 하나님께 솔직하게 이야기하는 시간을 가져 보세요.' },
+  { cat:'lonely', t:'너는 두려워 말라 내가 너를 구속하였고 내가 너를 지명하여 불렀나니 너는 내 것이라.', r:'이사야 43:1', c:'"내 이름을 지명하여 부르셨다"는 사실을 오늘 하루의 문장으로 삼아 보세요.' },
+  { cat:'lonely', t:'하나님은 우리의 피난처시요 힘이시니 환난 중에 만날 큰 도움이시라.', r:'시편 46:1', c:'마음이 허전할 때 SNS 대신 이 구절을 먼저 열어 보세요.' },
+  { cat:'lonely', t:'내가 새벽 날개를 치며 바다 끝에 가서 거할지라도 곧 거기서도 주의 손이 나를 인도하시며 주의 오른손이 나를 붙드시리이다.', r:'시편 139:9-10', c:'가장 멀게 느껴지는 자리에서도 함께하시는 하나님을 떠올려 보세요.' },
+  { cat:'lonely', t:'여인이 어찌 그 젖먹는 자식을 잊겠으며 자기 태에서 난 아들을 긍휼히 여기지 않겠느냐 그들은 혹시 잊을지라도 나는 너를 잊지 아니할 것이라.', r:'이사야 49:15', c:'잊혀진 것 같은 날, "나는 너를 잊지 아니할 것이라"를 붙들어 보세요.' },
+  { cat:'lonely', t:'여호와는 마음이 상한 자에게 가까이 하시고 중심에 통회하는 자를 구원하시는도다.', r:'시편 34:18', c:'마음이 상한 오늘이야말로 하나님이 가장 가까이 계신 날이에요.' },
+  { cat:'lonely', t:'너의 하나님 여호와가 너의 가운데 계시니 그는 구원을 베푸실 전능자시라 그가 너로 인하여 기쁨을 이기지 못하여 하시며 너를 잠잠히 사랑하시며 너로 인하여 즐거이 부르며 기뻐하시리라.', r:'스바냐 3:17', c:'나로 인해 기뻐 노래하시는 하나님을 상상하며 하루를 시작해 보세요.' },
+  { cat:'lonely', t:'내가 너희를 고아와 같이 버려두지 아니하고 너희에게로 오리라.', r:'요한복음 14:18', c:'홀로 남겨진 것 같을 때 "너희에게로 오리라"는 약속을 소리 내어 읽어 보세요.' },
+  // 정욕과 원치 않는 생각
+  { cat:'lust', t:'사람이 감당할 시험 밖에는 너희에게 당한 것이 없나니 시험 당할 즈음에 또한 피할 길을 내사 너희로 능히 감당하게 하시느니라.', r:'고린도전서 10:13', c:'유혹이 오는 순간의 "피할 길" 한 가지를 미리 정해 두세요. 자리를 옮기는 것만으로도 충분해요.' },
+  { cat:'lust', t:'무엇에든지 참되며 무엇에든지 경건하며 무엇에든지 옳으며 무엇에든지 정결하며 무엇에든지 사랑할 만하며 무엇에든지 칭찬할 만하며 이것들을 생각하라.', r:'빌립보서 4:8', c:'원치 않는 생각이 들 때, 억누르기보다 "생각할 만한 것"으로 채널을 바꿔 보세요.' },
+  { cat:'lust', t:'청년이 무엇으로 그 행실을 깨끗케 하리이까 주의 말씀을 지킬 따름이니이다.', r:'시편 119:9', c:'오늘 이 구절을 화면 잠금 배경처럼 자주 보이는 곳에 두어 보세요.' },
+  { cat:'lust', t:'너희는 성령을 좇아 행하라 그리하면 육체의 욕심을 이루지 아니하리라.', r:'갈라디아서 5:16', c:'이기려 애쓰기보다, 좋은 것으로 하루를 먼저 채우는 데 집중해 보세요.' },
+  { cat:'lust', t:'너희는 이 세대를 본받지 말고 오직 마음을 새롭게 함으로 변화를 받아 하나님의 선하시고 기뻐하시고 온전하신 뜻이 무엇인지 분별하도록 하라.', r:'로마서 12:2', c:'오늘 나의 생각을 채우는 콘텐츠 하나를 점검하고, 하나를 바꿔 보세요.' },
+  { cat:'lust', t:'마음이 청결한 자는 복이 있나니 저희가 하나님을 볼 것임이요.', r:'마태복음 5:8', c:'보는 것을 지키는 것이 마음을 지키는 첫걸음이에요. 오늘 하나만 걸러 보세요.' },
+  { cat:'lust', t:'그런즉 너희는 하나님께 순복할지어다 마귀를 대적하라 그리하면 너희를 피하리라.', r:'야고보서 4:7', c:'유혹의 순간, 혼자 싸우지 말고 먼저 하나님께 순복하는 기도로 시작해 보세요.' },
+  { cat:'lust', t:'내가 주께 범죄치 아니하려 하여 주의 말씀을 내 마음에 두었나이다.', r:'시편 119:11', c:'이 구절을 외워 두었다가 유혹의 순간에 꺼내어 보세요.' },
+  { cat:'lust', t:'모든 생각을 사로잡아 그리스도에게 복종케 하니.', r:'고린도후서 10:5', c:'떠오르는 생각을 그냥 따라가지 말고, 하나씩 "사로잡아" 점검해 보세요.' },
+  { cat:'lust', t:'또한 네가 청년의 정욕을 피하고 주를 깨끗한 마음으로 부르는 자들과 함께 의와 믿음과 사랑과 화평을 좇으라.', r:'디모데후서 2:22', c:'피하는 것은 지는 게 아니에요. 오늘은 피해야 할 자리를 미리 정해 보세요.' },
+  // 하나님과 멀어진 느낌
+  { cat:'distant', t:'하나님을 가까이 하라 그리하면 너희를 가까이 하시리라.', r:'야고보서 4:8', c:'거창한 결심 대신, 오늘 단 5분만 조용히 하나님 앞에 앉아 보세요.' },
+  { cat:'distant', t:'너희가 전심으로 나를 찾고 찾으면 나를 만나리라.', r:'예레미야 29:13', c:'솔직한 마음 그대로 "다시 만나고 싶습니다"라고 기도해 보세요. 그게 시작이에요.' },
+  { cat:'distant', t:'하나님이여 사슴이 시냇물을 찾기에 갈급함 같이 내 영혼이 주를 찾기에 갈급하니이다.', r:'시편 42:1', c:'멀게 느껴지는 이 목마름 자체가, 이미 하나님을 향해 있다는 증거예요.' },
+  { cat:'distant', t:'볼지어다 내가 문 밖에 서서 두드리노니 누구든지 내 음성을 듣고 문을 열면 내가 그에게로 들어가 그로 더불어 먹고 그는 나로 더불어 먹으리라.', r:'요한계시록 3:20', c:'먼저 찾아와 문을 두드리시는 분은 하나님이세요. 오늘 그 문을 여는 짧은 기도로 응답해 보세요.' },
+  { cat:'distant', t:'여호와를 만날 만한 때에 찾으라 가까이 계실 때에 그를 부르라.', r:'이사야 55:6', c:'"나중에"가 아니라 지금, 있는 모습 그대로 부르면 됩니다.' },
+  { cat:'distant', t:'여호와께서는 자기에게 간구하는 모든 자 곧 진실하게 간구하는 모든 자에게 가까이 하시는도다.', r:'시편 145:18', c:'진실한 한 마디면 충분해요. 지금 짧게 불러 보세요.' },
+  { cat:'distant', t:'무릇 기다리는 자에게나 구하는 영혼에게 여호와께서 선을 베푸시는도다.', r:'예레미야애가 3:25', c:'응답이 더딘 것 같아도, 기다리는 그 시간에도 선을 베풀고 계세요.' },
+  { cat:'distant', t:'하나님이여 주는 나의 하나님이시라 내가 간절히 주를 찾되 물이 없어 마르고 곤핍한 땅에서 내 영혼이 주를 갈망하며 내 육체가 주를 앙모하나이다.', r:'시편 63:1', c:'메마른 마음 그대로 "주를 갈망합니다"라고 고백해 보세요.' },
+  { cat:'distant', t:'그러므로 우리가 여호와를 알자 힘써 여호와를 알자 그의 나오심은 새벽 빛 같이 일정하니.', r:'호세아 6:3', c:'오늘 "힘써 여호와를 알자"는 마음으로 말씀 한 장을 읽어 보세요.' },
+  { cat:'distant', t:'내가 여호와를 항상 내 앞에 모심이여 그가 내 우편에 계시므로 내가 요동치 아니하리로다.', r:'시편 16:8', c:'오늘 하루, 결정의 순간마다 "주께서 우편에 계시다"를 떠올려 보세요.' },
+  // 의심과 실망
+  { cat:'doubt', t:'내가 믿나이다 나의 믿음 없는 것을 도와주소서.', r:'마가복음 9:24', c:'의심을 감추지 말고 오늘 이 한 문장을 그대로 기도로 드려 보세요.' },
+  { cat:'doubt', t:'너는 마음을 다하여 여호와를 의뢰하고 네 명철을 의지하지 말라 너는 범사에 그를 인정하라 그리하면 네 길을 지도하시리라.', r:'잠언 3:5-6', c:'이해되지 않는 일 하나를 "그래도 맡깁니다"라고 내려놓아 보세요.' },
+  { cat:'doubt', t:'믿음은 바라는 것들의 실상이요 보지 못하는 것들의 증거니.', r:'히브리서 11:1', c:'지금까지 지나온 길에서 하나님이 함께하셨던 순간 하나를 떠올려 적어 보세요.' },
+  { cat:'doubt', t:'너는 나를 본 고로 믿느냐 보지 못하고 믿는 자들은 복되도다.', r:'요한복음 20:29', c:'보이지 않아 흔들리는 오늘의 믿음이, 예수님이 "복되다" 하신 바로 그 믿음이에요.' },
+  { cat:'doubt', t:'너희는 여호와의 선하심을 맛보아 알지어다 그에게 피하는 자는 복이 있도다.', r:'시편 34:8', c:'따지기 전에 한 번 맛보기 — 오늘 하루만 온전히 맡겨 보는 실험을 해 보세요.' },
+  { cat:'doubt', t:'하늘이 땅보다 높음 같이 내 길은 너희 길보다 높으며 내 생각은 너희 생각보다 높으니라.', r:'이사야 55:9', c:'이해되지 않는 그 일이, 더 높은 길일 수 있음을 인정해 보세요.' },
+  { cat:'doubt', t:'그러므로 믿음은 들음에서 나며 들음은 그리스도의 말씀으로 말미암았느니라.', r:'로마서 10:17', c:'믿음이 약해질 땐 애쓰기보다 말씀을 더 자주 들어 보세요.' },
+  { cat:'doubt', t:'내가 산을 향하여 눈을 들리라 나의 도움이 어디서 올꼬 나의 도움이 천지를 지으신 여호와에게서로다.', r:'시편 121:1-2', c:'오늘 고개를 들어, 도움이 어디서 오는지 다시 확인해 보세요.' },
+  { cat:'doubt', t:'주께서는 무소불능하시오며 무슨 경영이든지 못 이루실 것이 없는 줄 아오니.', r:'욥기 42:2', c:'막힌 것 같은 상황에서 "못 이루실 것이 없다"고 고백해 보세요.' },
+  { cat:'doubt', t:'이는 우리가 믿음으로 행하고 보는 것으로 하지 아니함이로라.', r:'고린도후서 5:7', c:'보이는 상황 말고, 믿는 약속을 기준으로 오늘 하나를 선택해 보세요.' },
+  // 일반 · 소망
+  { cat:'unsure', t:'나 여호와가 말하노라 너희를 향한 나의 생각은 내가 아나니 재앙이 아니라 곧 평안이요 너희 장래에 소망을 주려하는 생각이라.', r:'예레미야 29:11', c:'막막한 오늘, "나를 향한 계획이 평안과 소망"이라는 문장을 붙들어 보세요.' },
+  { cat:'unsure', t:'이 날은 여호와의 정하신 것이라 이 날에 우리가 즐거워하고 기뻐하리로다.', r:'시편 118:24', c:'오늘 감사한 것 세 가지를 자기 전에 적어 보세요.' },
+  { cat:'unsure', t:'여호와의 인자와 긍휼이 무궁하시므로 우리가 진멸되지 아니함이니이다 이것이 아침마다 새로우니 주의 성실이 크도소이다.', r:'예레미야애가 3:22-23', c:'어제가 어땠든, 오늘 아침의 긍휼은 새것이에요. 새 마음으로 하루를 열어 보세요.' },
+  { cat:'unsure', t:'구하라 그러면 너희에게 주실 것이요 찾으라 그러면 찾을 것이요 문을 두드리라 그러면 너희에게 열릴 것이니.', r:'마태복음 7:7', c:'마음속에만 담아 두었던 소원 하나를 오늘 처음으로 소리 내어 구해 보세요.' },
+  { cat:'unsure', t:'오직 여호와를 앙망하는 자는 새 힘을 얻으리니 독수리의 날개치며 올라감 같을 것이요 달음박질하여도 곤비치 아니하겠고 걸어가도 피곤치 아니하리로다.', r:'이사야 40:31', c:'지친 오늘, 무언가를 더 하기보다 잠시 멈추어 "앙망하는" 시간을 먼저 가져 보세요.' },
+  { cat:'unsure', t:'우리가 알거니와 하나님을 사랑하는 자 곧 그 뜻대로 부르심을 입은 자들에게는 모든 것이 합력하여 선을 이루느니라.', r:'로마서 8:28', c:'이해되지 않는 일 하나에 "합력하여 선을 이루신다"는 말씀을 겹쳐 보세요.' },
+  { cat:'unsure', t:'너의 길을 여호와께 맡기라 저를 의지하면 저가 이루시고.', r:'시편 37:5', c:'오늘의 길을 아침에 먼저 맡기고 출발해 보세요.' },
+  { cat:'unsure', t:'우리가 선을 행하되 낙심하지 말지니 피곤하지 아니하면 때가 이르매 거두리라.', r:'갈라디아서 6:9', c:'결과가 보이지 않아도, 오늘 몫의 선을 한 가지 행해 보세요.' },
+  { cat:'unsure', t:'내게 능력 주시는 자 안에서 내가 모든 것을 할 수 있느니라.', r:'빌립보서 4:13', c:'두려운 일 앞에서 "능력 주시는 자 안에서"를 먼저 고백해 보세요.' },
+  { cat:'unsure', t:'주의 말씀은 내 발에 등이요 내 길에 빛이니이다.', r:'시편 119:105', c:'다음 걸음이 안 보일 땐, 발 앞의 한 걸음만 비추어 달라고 구해 보세요.' },
+  { cat:'unsure', t:'마음을 강하게 하고 담대히 하라 두려워 말며 놀라지 말라 네가 어디로 가든지 네 하나님 여호와가 너와 함께 하느니라.', r:'여호수아 1:9', c:'새로운 시작 앞에서 "강하고 담대하라"를 오늘의 문장으로 삼아 보세요.' },
+];
+
+const CHARS = {
+  esther: { name:'에스더', trait:'용기 있고 결단력 있는',
+    v:{ t:'너는 벙어리와 고독한 자의 송사를 위하여 입을 열지니라.', r:'잠언 31:8',
+        c:'오늘 에스더처럼, 스스로 목소리를 낼 수 없는 누군가를 위해 용기 있게 대신 말해 주세요.' } },
+  david: { name:'다윗', trait:'마음을 다해 예배하는',
+    v:{ t:'하나님이여 내 속에 정한 마음을 창조하시고 내 안에 정직한 영을 새롭게 하소서.', r:'시편 51:10',
+        c:'다윗처럼 오늘, 꾸미지 않은 솔직한 마음 그대로 하나님께 털어놓는 기도를 드려 보세요.' } },
+  daniel: { name:'다니엘', trait:'흔들리지 않고 신실한',
+    v:{ t:'다니엘이 전에 행하던 대로 하루 세 번씩 무릎을 꿇고 기도하며 그 하나님께 감사하였더라.', r:'다니엘 6:10',
+        c:'다니엘처럼 오늘 하루 세 번, 짧게라도 멈추어 감사의 기도를 드려 보세요.' } },
+  ruth: { name:'룻', trait:'끝까지 곁을 지키는',
+    v:{ t:'어머니께서 가시는 곳에 나도 가고 어머니께서 유숙하시는 곳에서 나도 유숙하겠나이다 어머니의 백성이 나의 백성이 되고 어머니의 하나님이 나의 하나님이 되시리니.', r:'룻기 1:16',
+        c:'룻처럼 오늘, 소중한 사람 곁에 말없이 머물러 주는 사람이 되어 보세요.' } },
+  peter: { name:'베드로', trait:'넘어져도 다시 일어서는',
+    v:{ t:'너희 염려를 다 주께 맡겨 버리라 이는 저가 너희를 권고하심이니라.', r:'베드로전서 5:7',
+        c:'베드로처럼 넘어진 자리에서 다시 일어나, 오늘의 걱정 하나를 주님께 맡겨 보세요.' } },
+  mary: { name:'마리아', trait:'믿음으로 순종하는',
+    v:{ t:'주의 여종이오니 말씀대로 내게 이루어지이다.', r:'누가복음 1:38',
+        c:'마리아처럼 오늘, 이해되지 않는 상황 앞에서 "말씀대로 이루어지이다"라고 고백해 보세요.' } },
+};
+
+const GOALS = {
+  guilt:   '죄책감 대신 용서와 은혜를 매일 새롭게 발견하도록.',
+  anxiety: '매일의 말씀과 기도로 마음의 평안을 찾도록.',
+  lonely:  '혼자가 아니라는 사실을 매일 말씀으로 확인하도록.',
+  lust:    '생각을 정결하고 좋은 것으로 채워가도록.',
+  distant: '매일 말씀과 묵상으로 하나님과 다시 가까워지도록.',
+  doubt:   '흔들리는 순간에도 붙들 수 있는 약속을 매일 발견하도록.',
+  unsure:  '매일 한 구절씩, 나에게 필요한 말씀을 만나도록.',
+};
+
+// ─── 배경 씬 ───────────────────────────
+const SCENES = [
+  { id:'sc-sea',   light:true  },
+  { id:'sc-dusk',  light:true  },
+  { id:'sc-mist',  light:false },
+  { id:'sc-dawn',  light:false },
+  { id:'sc-gold',  light:true  },
+  { id:'sc-night', light:true  },
+];
+function setScene(i) {
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('on'));
+  const sc = SCENES[i % SCENES.length];
+  document.getElementById(sc.id).classList.add('on');
+  document.body.classList.toggle('light-text', sc.light);
+}
+function setMistScene() {
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('on'));
+  document.getElementById('sc-mist').classList.add('on');
+  document.body.classList.remove('light-text');
+}
+
+// ─── 상태 ───────────────────────────
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem('dv_state')) || {}; } catch(e) { return {}; } },
+  set(s) { localStorage.setItem('dv_state', JSON.stringify(s)); }
+};
+let state = store.get();
+let currentVerse = null;
+let sceneIdx = 0;
+
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+// ─── 온보딩 ───────────────────────────
+function pickCat(cat) { state.cat = cat; store.set(state); go('s-q2'); }
+function pickTime(time) {
+  state.time = time; store.set(state);
+  document.getElementById('goal1').textContent = GOALS[state.cat] || GOALS.unsure;
+  document.getElementById('goal2').textContent = `${state.time}마다 나를 위한 한 구절과 실천 카드를 만나도록.`;
+  go('s-goals');
+}
+function pickChar(key) {
+  state.char = key; store.set(state);
+  const ch = CHARS[key];
+  document.getElementById('charName').textContent = ch.name;
+  document.getElementById('charName2').textContent = ch.name;
+  document.getElementById('charTrait').textContent = ch.trait;
+  go('s-charResult');
+}
+function showFirstVerse() {
+  const v = CHARS[state.char].v;
+  document.getElementById('fvText').textContent = v.t;
+  document.getElementById('fvRef').textContent = v.r;
+  document.getElementById('fvCta').textContent = v.c;
+  setScene(0); sceneIdx = 0;
+  go('s-firstVerse');
+}
+function enterMain() {
+  state.done = true; store.set(state);
+  initMain();
+}
+
+// ─── 메인 ───────────────────────────
+const CAT_LABELS = {
+  guilt:'죄책감이나 수치심', anxiety:'불안과 걱정', lonely:'외로움과 공허함',
+  lust:'정욕과 원치 않는 생각', distant:'하나님과 멀어진 느낌',
+  doubt:'의심과 실망', unsure:'잘 모르겠어요',
+};
+function pool() {
+  const cat = state.cat || 'unsure';
+  const p = VERSES.filter(v => v.cat === cat);
+  return p.length ? p : VERSES;
+}
+function daysSinceEpoch() { return Math.floor(Date.now() / 86400000); }
+function updateCatLabel() {
+  document.getElementById('catLabel').textContent = CAT_LABELS[state.cat] || CAT_LABELS.unsure;
+}
+function openCatPanel() { document.getElementById('catPanel').classList.add('on'); }
+function closeCatPanel() { document.getElementById('catPanel').classList.remove('on'); }
+function changeCat(cat) {
+  state.cat = cat; store.set(state);
+  updateCatLabel();
+  closeCatPanel();
+  const p = pool();
+  sceneIdx = (sceneIdx + 1) % SCENES.length;
+  setScene(sceneIdx);
+  renderVerse(p[Math.floor(Math.random() * p.length)]);
+  toast(`'${CAT_LABELS[cat]}'에 맞는 말씀을 준비했어요`);
+}
+
+function renderVerse(v) {
+  currentVerse = v;
+  document.getElementById('mText').textContent = v.t;
+  document.getElementById('mRef').textContent = v.r;
+  document.getElementById('mCta').textContent = v.c;
+  updateHeart();
+}
+function nextVerse() {
+  const p = pool();
+  let v;
+  do { v = p[Math.floor(Math.random() * p.length)]; } while (p.length > 1 && v === currentVerse);
+  sceneIdx = (sceneIdx + 1) % SCENES.length;
+  setScene(sceneIdx);
+  renderVerse(v);
+}
+
+function updateStreak() {
+  const today = daysSinceEpoch();
+  if (state.lastDay === today) { /* 이미 방문 */ }
+  else if (state.lastDay === today - 1) { state.streak = (state.streak || 0) + 1; }
+  else { state.streak = 1; }
+  state.lastDay = today; store.set(state);
+  const el = document.getElementById('mStreak');
+  el.textContent = state.streak > 1 ? `🔥 ${state.streak}일째 말씀과 함께하고 있어요` : '오늘도 말씀과 함께해요';
+}
+
+function initMain() {
+  const d = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  document.getElementById('mDate').textContent =
+    `${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`;
+  updateStreak();
+  updateCatLabel();
+  updateBell();
+  const p = pool();
+  sceneIdx = daysSinceEpoch() % SCENES.length;
+  setScene(sceneIdx);
+  renderVerse(p[daysSinceEpoch() % p.length]);
+  updateSavedCount();
+  go('s-main');
+  scheduleNotif();
+}
+
+// ─── 저장 ───────────────────────────
+function savedList() { return state.saved || []; }
+function isSaved(v) { return savedList().some(s => s.r === v.r); }
+function toggleSave() {
+  if (!currentVerse) return;
+  let s = savedList();
+  if (isSaved(currentVerse)) {
+    s = s.filter(x => x.r !== currentVerse.r);
+    toast('저장을 해제했어요');
+  } else {
+    s.push({ t: currentVerse.t, r: currentVerse.r });
+    toast('말씀을 저장했어요 ♥');
+  }
+  state.saved = s; store.set(state);
+  updateHeart(); updateSavedCount();
+}
+function updateHeart() {
+  const on = currentVerse && isSaved(currentVerse);
+  document.getElementById('heartIcon').setAttribute('fill', on ? 'currentColor' : 'none');
+}
+function updateSavedCount() {
+  const n = savedList().length;
+  document.getElementById('savedCount').textContent = n ? `(${n})` : '';
+}
+function openSaved() {
+  const list = document.getElementById('spList');
+  const s = savedList();
+  list.innerHTML = s.length
+    ? s.map(v => `<div class="sp-item"><p>${v.t}</p><div class="ref">${v.r}</div></div>`).reverse().join('')
+    : '<div class="sp-empty">아직 저장한 말씀이 없어요.<br>마음에 닿는 구절에서 ♡를 눌러 보세요.</div>';
+  document.getElementById('savedPanel').classList.add('on');
+}
+function closeSaved() { document.getElementById('savedPanel').classList.remove('on'); }
+function resetAll() {
+  if (!confirm('온보딩부터 다시 시작할까요? 저장한 말씀도 함께 지워져요.')) return;
+  localStorage.removeItem('dv_state');
+  location.reload();
+}
+
+// ─── 백업 / 복원 ───────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '오늘의말씀-백업.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('백업 파일을 내려받았어요');
+}
+function importData(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (typeof data !== 'object' || data === null) throw new Error();
+      state = data; store.set(state);
+      toast('복원했어요. 앱을 다시 시작합니다');
+      setTimeout(() => location.reload(), 900);
+    } catch(e) { toast('백업 파일이 올바르지 않아요'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ─── 알림 ───────────────────────────
+const TIME_MAP = { '아침':[8,0], '점심':[12,30], '저녁':[20,0], '잠들기 전':[22,30] };
+function notifTime() { return TIME_MAP[state.time] || TIME_MAP['아침']; }
+function updateBell() {
+  const on = !!state.notif && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  document.getElementById('bellIcon').setAttribute('fill', on ? 'currentColor' : 'none');
+}
+async function toggleNotif() {
+  if (typeof Notification === 'undefined') { toast('이 브라우저는 알림을 지원하지 않아요'); return; }
+  if (state.notif) {
+    state.notif = false; store.set(state); updateBell();
+    toast('알림을 껐어요'); return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('알림 권한이 허용되지 않았어요'); return; }
+  state.notif = true; store.set(state); updateBell();
+  scheduleNotif();
+  const [h,m] = notifTime();
+  toast(`매일 ${state.time || '아침'} ${h}:${String(m).padStart(2,'0')} 알림을 켰어요`);
+}
+// 지원 브라우저(안드로이드 크롬 일부)에서는 앱이 꺼져 있어도 예약 알림 시도
+async function scheduleNotif() {
+  if (!state.notif || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  try {
+    if (!('serviceWorker' in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !('showTrigger' in Notification.prototype) || typeof TimestampTrigger === 'undefined') return;
+    const [h,m] = notifTime();
+    const when = new Date(); when.setHours(h,m,0,0);
+    if (when <= new Date()) when.setDate(when.getDate() + 1);
+    const p = pool();
+    const v = p[(daysSinceEpoch()+1) % p.length];
+    const old = await reg.getNotifications({ tag:'daily-verse', includeTriggered:false }).catch(()=>[]);
+    old.forEach(n => n.close());
+    await reg.showNotification('오늘의 말씀', {
+      body:`${v.t}\n— ${v.r}`, tag:'daily-verse', icon:'icon-192.png',
+      showTrigger: new TimestampTrigger(when.getTime()),
+    });
+  } catch(e) { /* 미지원 환경 */ }
+}
+// 앱이 열려 있는 동안 시간이 되면 알림
+setInterval(() => {
+  if (!state.notif || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const [h,m] = notifTime();
+  const n = new Date();
+  if (n.getHours() === h && n.getMinutes() === m && state.lastNotifDay !== daysSinceEpoch()) {
+    state.lastNotifDay = daysSinceEpoch(); store.set(state);
+    const p = pool();
+    const v = p[daysSinceEpoch() % p.length];
+    try { new Notification('오늘의 말씀', { body:`${v.t}\n— ${v.r}`, icon:'icon-192.png' }); } catch(e) {}
+  }
+}, 30000);
+
+// ─── 공유 ───────────────────────────
+function shareVerse() {
+  if (!currentVerse) return;
+  const msg = `"${currentVerse.t}"\n— ${currentVerse.r}`;
+  if (navigator.share) {
+    navigator.share({ title:'오늘의 말씀', text: msg }).catch(() => {});
+    return;
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(msg).then(() => toast('말씀을 복사했어요'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = msg; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+    toast('말씀을 복사했어요');
+  }
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 2200);
+}
+
+// ─── PWA 설치 ───────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+async function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('installBtn').style.display = 'none';
+}
+
+// ─── 서비스 워커 ───────────────────────────
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ─── 시작 ───────────────────────────
+if (state.done) initMain();
+else setMistScene();
+</script>
+</body>
+</html>
