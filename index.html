@@ -406,6 +406,13 @@
             <path d="M12 21C12 21 3.5 15.5 3.5 9.5C3.5 6.5 5.8 4.5 8.2 4.5C9.9 4.5 11.3 5.5 12 6.8C12.7 5.5 14.1 4.5 15.8 4.5C18.2 4.5 20.5 6.5 20.5 9.5C20.5 15.5 12 21 12 21Z"/>
           </svg>
         </button>
+        <button class="icon-btn" onclick="saveVerseImage()" title="사진으로 저장">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <rect x="3.5" y="5" width="17" height="14" rx="2.5"/>
+            <circle cx="9" cy="10" r="1.8"/>
+            <path d="M4.5 17.5L9.5 13L13 16L16 13.5L19.5 17"/>
+          </svg>
+        </button>
         <button class="icon-btn" onclick="shareVerse()" title="공유">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <rect x="8" y="8" width="12" height="12" rx="2.5"/>
@@ -835,6 +842,120 @@ setInterval(() => {
     try { new Notification('오늘의 말씀', { body:`${v.t}\n— ${v.r}`, icon:'icon-192.png' }); } catch(e) {}
   }
 }, 30000);
+
+// ─── 말씀 이미지 저장 ───────────────────────────
+const IMG_SCENES = {
+  'sc-sea':   { stops:[[0,'#fdf4e2'],[.16,'#f8d9c3'],[.32,'#f1a8b2'],[.42,'#e78d9d'],[.48,'#eeb59b'],[.58,'#d9b5a9'],[.78,'#a3c2d9'],[1,'#78a7c8']], deco:'sea', light:true },
+  'sc-dusk':  { stops:[[0,'#535d84'],[.26,'#7c688f'],[.46,'#b57a85'],[.62,'#e5927f'],[.78,'#f2a985'],[1,'#f7c9a0']], m1:'rgba(40,36,66,.55)', m2:'rgba(26,23,48,.85)', light:true },
+  'sc-mist':  { stops:[[0,'#faf3dc'],[.34,'#f6ecd0'],[.6,'#eadcc0'],[1,'#d8c5ab']], m1:'rgba(118,98,84,.42)', m2:'rgba(84,66,56,.58)', light:false },
+  'sc-night': { stops:[[0,'#0a0f24'],[.48,'#141c3a'],[.82,'#26355c'],[1,'#3c4f78']], deco:'stars', m2:'rgba(6,9,20,.9)', light:true },
+  'sc-dawn':  { stops:[[0,'#e7e1f3'],[.38,'#efd9dd'],[.64,'#f7ddd2'],[1,'#faeddc']], m1:'rgba(173,150,168,.35)', m2:'rgba(140,116,138,.5)', light:false },
+  'sc-gold':  { stops:[[0,'#fcecc9'],[.34,'#f5d49a'],[.66,'#e5ab6e'],[1,'#c07d4b']], m1:'rgba(146,90,46,.45)', m2:'rgba(104,60,28,.6)', light:true },
+};
+const IMG_FONT = "Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif";
+
+function imgMountains(ctx, W, H, color, pts) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  pts.forEach(([x, y]) => ctx.lineTo(x * W, y * H));
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+}
+function imgWrap(ctx, text, maxW) {
+  const lines = [];
+  let line = '';
+  for (const w of text.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+    else line = t;
+  }
+  if (line) lines.push(line);
+  return lines.flatMap(l => {
+    if (ctx.measureText(l).width <= maxW) return [l];
+    const out = []; let cur = '';
+    for (const ch of l) {
+      if (ctx.measureText(cur + ch).width > maxW && cur) { out.push(cur); cur = ch; }
+      else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+  });
+}
+function renderVerseImage(v) {
+  return new Promise(resolve => {
+    const W = 1080, H = 1920;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const sc = IMG_SCENES[SCENES[sceneIdx % SCENES.length].id];
+    // 배경 그라데이션
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    sc.stops.forEach(([t, c]) => g.addColorStop(t, c));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // 장식 (본문을 가리지 않도록 물결은 아래쪽, 별은 위쪽에만)
+    if (sc.deco === 'sea') {
+      ctx.fillStyle = 'rgba(255,255,255,.18)';
+      [[90,1440,900,7],[220,1560,640,6],[60,1680,760,6],[300,1790,520,5]].forEach(r => ctx.fillRect(...r));
+    }
+    if (sc.deco === 'stars') {
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 42; i++) {
+        const x = (i * 197) % W, y = ((i * 283) % 430) + 50, r = (i % 3) * .9 + 1.4;
+        ctx.globalAlpha = .35 + (i % 5) * .13;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (sc.m1) imgMountains(ctx, W, H, sc.m1, [[0,.72],[.26,.60],[.5,.74],[.76,.62],[1,.72]]);
+    if (sc.m2) imgMountains(ctx, W, H, sc.m2, [[0,.87],[.34,.72],[.66,.88],[1,.78]]);
+    // 본문
+    ctx.textAlign = 'center';
+    ctx.fillStyle = sc.light ? '#fdfcf8' : '#4a463c';
+    ctx.shadowColor = sc.light ? 'rgba(0,0,0,.3)' : 'rgba(0,0,0,.08)';
+    ctx.shadowBlur = 16;
+    ctx.font = `300 58px ${IMG_FONT}`;
+    const lines = imgWrap(ctx, v.t, 880);
+    const lh = 100;
+    let y = H * .44 - (lines.length - 1) * lh / 2;
+    lines.forEach(l => { ctx.fillText(l, W / 2, y); y += lh; });
+    // 출처
+    ctx.shadowBlur = 8;
+    ctx.font = `400 34px ${IMG_FONT}`;
+    try { ctx.letterSpacing = '12px'; } catch(e) {}
+    ctx.globalAlpha = .8;
+    ctx.fillText(v.r, W / 2, y + 40);
+    // 워터마크
+    ctx.globalAlpha = .5;
+    ctx.font = `300 28px ${IMG_FONT}`;
+    try { ctx.letterSpacing = '8px'; } catch(e) {}
+    ctx.fillText('오늘의 말씀', W / 2, H - 100);
+    ctx.globalAlpha = 1;
+    try { ctx.letterSpacing = '0px'; } catch(e) {}
+    cv.toBlob(resolve, 'image/png');
+  });
+}
+async function saveVerseImage() {
+  if (!currentVerse) return;
+  toast('이미지를 만들고 있어요…');
+  const blob = await renderVerseImage(currentVerse);
+  if (!blob) { toast('이미지 생성에 실패했어요'); return; }
+  const name = `오늘의말씀-${currentVerse.r.replace(/[:\s]/g, '_')}.png`;
+  const file = new File([blob], name, { type:'image/png' });
+  if (navigator.canShare && navigator.canShare({ files:[file] })) {
+    try {
+      await navigator.share({ files:[file], title:'오늘의 말씀' });
+      return;
+    } catch(e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('이미지를 저장했어요');
+}
 
 // ─── 공유 ───────────────────────────
 function shareVerse() {

@@ -1,4 +1,4 @@
-const CACHE = 'daily-verse-v1';
+const CACHE = 'daily-verse-v2';
 const ASSETS = [
   './',
   './index.html',
